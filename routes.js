@@ -256,7 +256,7 @@ router.get('/notificaciones', (req, res) => {
 });
 
 // Obtener un registro de tb_fallas por su ID
-router.get('/notificaciones/:id', (req, res) => {
+router.get('/fallas/:id', (req, res) => {
   const id = req.params.id;
   connection.query('SELECT * FROM tb_notificaciones WHERE id = ?', [id], (err, results) => {
     if (err) {
@@ -478,7 +478,7 @@ router.post('/fallas', (req, res) => {
   });
 });
 // Eliminar un registro en tb_fallas
-router.delete('/notificaciones/:id', (req, res) => {
+router.delete('/fallas/:id', (req, res) => {
   const id = req.params.id;
 
   // Verificar que el registro existe antes de eliminar
