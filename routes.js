@@ -243,81 +243,8 @@ router.post('/login', (req, res) => {
   });
 });
 
-//----------- ENTREGAS -------------
-
-// Obtener todos los registros de tb_entregas
-router.get('/entregas', (req, res) => {
-  connection.query('SELECT * FROM tb_entregas', (err, results) => {
-    if (err) {
-      console.error('Error al obtener registros:', err);
-      res.status(500).json({ error: 'Error al obtener registros' });
-      return;
-    }
-    res.json(results);
-  });
-});
-
-// Obtener un registro de tb_entregas por su ID
-router.get('/entregas/:id', (req, res) => {
-  const id = req.params.id;
-  connection.query('SELECT * FROM tb_entregas WHERE id_entrega = ?', id, (err, results) => {
-    if (err) {
-      console.error('Error al obtener el registro:', err);
-      res.status(500).json({ error: 'Error al obtener el registro' });
-      return;
-    }
-    if (results.length === 0) {
-      res.status(404).json({ error: 'Registro no encontrado' });
-      return;
-    }
-    res.json(results[0]);
-  });
-});
-
-// Crear un nuevo registro en tb_entregas
-router.post('/entregas', (req, res) => {
-  const nuevaEntrega = req.body;
-  connection.query('INSERT INTO tb_entregas SET ?', nuevaEntrega, (err, results) => {
-    if (err) {
-      console.error('Error al crear una nueva entrega:', err);
-      res.status(500).json({ error: 'Error al crear una nueva entrega' });
-      return;
-    }
-    res.status(201).json({ message: 'Entrega creada exitosamente' });
-  });
-});
-
-// Actualizar un registro en tb_entregas
-router.put('/entregas/:id', (req, res) => {
-  const id = req.params.id;
-  const datosActualizados = req.body;
-  connection.query('UPDATE tb_entregas SET ? WHERE id_entrega = ?', [datosActualizados, id], (err, results) => {
-    if (err) {
-      console.error('Error al actualizar la entrega:', err);
-      res.status(500).json({ error: 'Error al actualizar la entrega' });
-      return;
-    }
-    res.json({ message: 'Entrega actualizada exitosamente' });
-  });
-});
-
-// Eliminar un registro en tb_entregas
-router.delete('/entregas/:id', (req, res) => {
-  const id = req.params.id;
-  connection.query('DELETE FROM tb_entregas WHERE id_entrega = ?', id, (err, results) => {
-    if (err) {
-      console.error('Error al eliminar la entrega:', err);
-      res.status(500).json({ error: 'Error al eliminar la entrega' });
-      return;
-    }
-    res.json({ message: 'Entrega eliminada exitosamente' });
-  });
-});
-
-//----------- FALLAS MEJORADOS -------------
-
 // Obtener todos los registros de tb_fallas
-router.get('/fallas', (req, res) => {
+router.get('/notificaciones', (req, res) => {
   connection.query('SELECT * FROM tb_fallas ORDER BY created_at DESC', (err, results) => {
     if (err) {
       console.error('Error al obtener registros:', err);
@@ -329,9 +256,9 @@ router.get('/fallas', (req, res) => {
 });
 
 // Obtener un registro de tb_fallas por su ID
-router.get('/fallas/:id', (req, res) => {
+router.get('/notificaciones/:id', (req, res) => {
   const id = req.params.id;
-  connection.query('SELECT * FROM tb_fallas WHERE id = ?', [id], (err, results) => {
+  connection.query('SELECT * FROM tb_notificaciones WHERE id = ?', [id], (err, results) => {
     if (err) {
       console.error('Error al obtener el registro:', err);
       res.status(500).json({ error: 'Error al obtener el registro' });
@@ -347,15 +274,30 @@ router.get('/fallas/:id', (req, res) => {
 
 // Crear un nuevo registro en tb_fallas
 router.post('/fallas', (req, res) => {
-  console.log('=== DATOS RECIBIDOS ===');
+  console.log('=== DATOS RECIBIDOS (PARA tb_notificaciones REAL) ===');
   console.log(req.body);
 
-  const { eco, placas, descripcion, observaciones, id_lugar } = req.body;
+  const { 
+    eco, placas, descripcion, observaciones, id_lugar, 
+    material, marca, anio, km, fecha, nombre_conductor,
+    reviso_por, autorizado_por, materials, cantidad,
+  } = req.body;
 
-  // Validar campos básicos INCLUYENDO id_lugar (ahora es requerido)
+  const safeString = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') return value.trim();
+    return String(value).trim();
+  };
+
+  const safeNumber = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const num = parseInt(value);
+    return isNaN(num) ? null : num;
+  };
+
+  // VALIDACIÓN DE CAMPOS REQUERIDOS
   if (!eco || !placas || !descripcion || !observaciones || !id_lugar) {
     console.log('❌ Validación fallida - campos faltantes');
-    console.log('Campos recibidos:', { eco: !!eco, placas: !!placas, descripcion: !!descripcion, observaciones: !!observaciones, id_lugar: !!id_lugar });
     return res.status(400).json({
       error: 'Faltan campos requeridos: eco, placas, descripcion, observaciones, id_lugar',
       campos_faltantes: {
@@ -368,124 +310,179 @@ router.post('/fallas', (req, res) => {
     });
   }
 
-  // Validar que id_lugar sea un número válido
-  const idLugarNum = parseInt(id_lugar);
-  if (isNaN(idLugarNum) || idLugarNum <= 0) {
+  const idLugarNum = safeNumber(id_lugar);
+  if (!idLugarNum || idLugarNum <= 0) {
     console.log('❌ id_lugar inválido:', id_lugar);
     return res.status(400).json({
       error: `id_lugar debe ser un número válido mayor a 0. Recibido: "${id_lugar}"`
     });
   }
 
-  console.log('🔍 Verificando que el lugar existe:', idLugarNum);
-
-  // Verificar que el lugar existe en tb_lugares
-  connection.query('SELECT * FROM tb_lugares WHERE id_lugar = ?', [idLugarNum], (err, lugares) => {
+  // BUSCAR UN USUARIO VÁLIDO PARA usuario_reporta_id
+  console.log('🔍 Buscando usuario para usuario_reporta_id...');
+  
+  connection.query('SELECT id_usuario, nombre, correo FROM tb_users LIMIT 1', (err, usuarios) => {
     if (err) {
-      console.error('❌ Error al verificar lugar:', err);
+      console.error('❌ Error al buscar usuarios:', err);
       return res.status(500).json({
-        error: 'Error al verificar el lugar en la base de datos',
-        mensaje: err.sqlMessage,
-        codigo: err.code
+        error: 'Error al buscar usuarios en la base de datos',
+        mensaje: err.sqlMessage
       });
     }
 
-    if (lugares.length === 0) {
-      console.log('❌ Lugar no encontrado:', idLugarNum);
-      
-      // Obtener lugares disponibles para mostrar en el error
-      connection.query('SELECT id_lugar, nombre FROM tb_lugares ORDER BY id_lugar', (err2, lugaresDisponibles) => {
-        let lugaresTexto = 'No se pudieron obtener los lugares disponibles';
-        if (!err2 && lugaresDisponibles.length > 0) {
-          lugaresTexto = lugaresDisponibles.map(l => `ID: ${l.id_lugar} (${l.nombre || 'Sin nombre'})`).join(', ');
-        }
-        
-        return res.status(400).json({
-          error: `El lugar con ID ${idLugarNum} no existe en tb_lugares`,
-          lugares_disponibles: !err2 ? lugaresDisponibles : [],
-          sugerencia: `Lugares disponibles: ${lugaresTexto}`
-        });
+    if (usuarios.length === 0) {
+      console.log('❌ No hay usuarios en tb_users');
+      return res.status(400).json({
+        error: 'No hay usuarios disponibles. Debes crear al menos un usuario primero.',
+        solucion: 'Ejecuta: INSERT INTO tb_users (nombre, correo, password) VALUES ("Sistema", "sistema@empresa.com", "password123");'
       });
-      return;
     }
 
-    const lugarEncontrado = lugares[0];
-    console.log('✅ Lugar verificado:', lugarEncontrado);
+    const usuarioReporta = usuarios[0];
+    console.log('✅ Usuario encontrado para reportar:', usuarioReporta);
 
-    // Preparar datos con el lugar verificado
-    const nuevaFalla = {
-      eco: eco.trim(),
-      placas: placas.trim().toUpperCase(), // Convertir placas a mayúsculas
-      descripcion: descripcion.trim(),
-      observaciones: observaciones.trim(),
-      id_lugar: idLugarNum  // 👈 USAR el lugar proporcionado y verificado
-    };
-
-    console.log('=== DATOS A INSERTAR (CON LUGAR VERIFICADO) ===');
-    console.log(nuevaFalla);
-    console.log('=== INFORMACIÓN DEL LUGAR ===');
-    console.log(lugarEncontrado);
-
-    // Insertar la falla con el lugar verificado
-    connection.query('INSERT INTO tb_fallas SET ?', nuevaFalla, (err, results) => {
+    // VERIFICAR QUE EL LUGAR EXISTE
+    console.log('🔍 Verificando que el lugar existe:', idLugarNum);
+    
+    connection.query('SELECT * FROM tb_lugares WHERE id_lugar = ?', [idLugarNum], (err, lugares) => {
       if (err) {
-        console.error('❌ ERROR SQL al insertar falla:', err.code);
-        console.error('❌ MENSAJE:', err.sqlMessage);
-        console.error('❌ QUERY:', err.sql);
-
-        // Manejo específico de errores comunes
-        let errorMessage = 'Error al crear la falla';
-        if (err.code === 'ER_NO_REFERENCED_ROW_2') {
-          errorMessage = 'Error de referencia: El lugar no existe o hay un problema de foreign key';
-        } else if (err.code === 'ER_BAD_FIELD_ERROR') {
-          errorMessage = `Campo inválido en la tabla: ${err.sqlMessage}`;
-        } else if (err.code === 'ER_NO_DEFAULT_FOR_FIELD') {
-          errorMessage = `Campo requerido faltante: ${err.sqlMessage}`;
-        }
-
-        res.status(500).json({
-          error: errorMessage,
-          codigo: err.code,
-          mensaje: err.sqlMessage,
-          campos_intentados: Object.keys(nuevaFalla),
-          lugar_usado: lugarEncontrado
+        console.error('❌ Error al verificar lugar:', err);
+        return res.status(500).json({
+          error: 'Error al verificar el lugar en la base de datos',
+          mensaje: err.sqlMessage
         });
-        return;
       }
 
-      console.log('✅ FALLA CREADA EXITOSAMENTE');
-      console.log('   - ID de falla:', results.insertId);
-      console.log('   - Lugar asignado:', lugarEncontrado.nombre || `ID: ${lugarEncontrado.id_lugar}`);
+      if (lugares.length === 0) {
+        console.log('❌ Lugar no encontrado:', idLugarNum);
+        return res.status(400).json({
+          error: `El lugar con ID ${idLugarNum} no existe en tb_lugares`
+        });
+      }
 
-      // Respuesta exitosa con información completa
-      res.status(201).json({
-        message: 'Falla creada exitosamente',
-        id_falla: results.insertId,
-        data: {
-          id_falla: results.insertId,
-          ...nuevaFalla,
-          lugar_info: {
-            id_lugar: lugarEncontrado.id_lugar,
-            nombre: lugarEncontrado.nombre,
-            descripcion: lugarEncontrado.descripcion
+      const lugarEncontrado = lugares[0];
+      console.log('✅ Lugar verificado:', lugarEncontrado);
+
+      // PREPARAR DATOS PARA INSERTAR EN tb_notificaciones (ESTRUCTURA REAL)
+      const nuevaNotificacion = {
+        // Campos básicos de la falla
+        id_lugar: idLugarNum,
+        eco: safeString(eco),
+        placas: safeString(placas) ? safeString(placas).toUpperCase() : null,
+        marca: safeString(marca),
+        anio: safeString(anio), // En tu tabla es 'anio', no 'ano'
+        km: safeString(km),
+        fecha: safeString(fecha), // Formato DATE
+        nombre_conductor: safeString(nombre_conductor),
+        descripcion: safeString(descripcion),
+        observaciones: safeString(observaciones),
+        
+        // Usuario que reporta (obligatorio por foreign key)
+        usuario_reporta_id: usuarioReporta.id_usuario,
+        nombre_usuario_reporta: safeString(usuarioReporta.nombre),
+        correo_usuario_reporta: safeString(usuarioReporta.correo),
+        
+        // Material
+        material: safeString(material),
+        cantidad: safeNumber(cantidad) || 0,
+        materials: materials && Array.isArray(materials) && materials.length > 0 
+          ? JSON.stringify(materials) 
+          : null,
+        
+        // Correo destino (opcional)
+        correo_destino: safeString(usuarioReporta.correo), // Usar el mismo usuario por defecto
+        
+        // Estado inicial
+        estado: 'pendiente', // ENUM: pendiente, aprobada, rechazada
+        
+        // Campos de autorización (opcionales)
+        autorizado_por: safeString(autorizado_por),
+        reviso_por: safeString(reviso_por),
+        
+        // Campos de aprobación (null inicialmente)
+        usuario_aprueba_id: null,
+        nombre_usuario_aprueba: null,
+        correo_usuario_aprueba: null,
+        fecha_aprobacion: null,
+        comentarios_admin: null
+      };
+
+      console.log('=== DATOS PREPARADOS PARA tb_notificaciones (ESTRUCTURA REAL) ===');
+      console.log(nuevaNotificacion);
+
+      // INSERTAR EN tb_notificaciones
+      connection.query('INSERT INTO tb_notificaciones SET ?', nuevaNotificacion, (err, results) => {
+        if (err) {
+          console.error('❌ ERROR SQL al insertar notificación:', err.code);
+          console.error('❌ MENSAJE:', err.sqlMessage);
+          console.error('❌ QUERY:', err.sql);
+
+          let errorMessage = 'Error al crear la notificación';
+          let solucion = '';
+          
+          if (err.code === 'ER_NO_REFERENCED_ROW_2') {
+            errorMessage = 'Error de foreign key: El usuario_reporta_id no existe en tb_users';
+            solucion = 'Verificar que exista al menos un usuario en tb_users';
+          } else if (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_UNKNOWN_COLUMN') {
+            errorMessage = `Columna no encontrada: ${err.sqlMessage}`;
+            solucion = 'Verificar que la estructura de tb_notificaciones coincida';
+          } else if (err.code === 'ER_NO_DEFAULT_FOR_FIELD') {
+            errorMessage = `Campo requerido faltante: ${err.sqlMessage}`;
+            solucion = 'Verificar las columnas requeridas en tb_notificaciones';
+          } else if (err.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD') {
+            errorMessage = 'Error en formato de fecha o valor inválido';
+            solucion = 'Verificar que la fecha esté en formato YYYY-MM-DD';
           }
-        },
-        resumen: {
-          eco: nuevaFalla.eco,
-          placas: nuevaFalla.placas,
-          lugar: lugarEncontrado.nombre || `ID: ${lugarEncontrado.id_lugar}`,
-          fecha_creacion: new Date().toISOString()
+
+          res.status(500).json({
+            error: errorMessage,
+            codigo: err.code,
+            mensaje: err.sqlMessage,
+            solucion: solucion,
+            campos_intentados: Object.keys(nuevaNotificacion),
+            usuario_usado: usuarioReporta,
+            lugar_usado: lugarEncontrado
+          });
+          return;
         }
+
+        console.log('✅ NOTIFICACIÓN CREADA EXITOSAMENTE EN ESTRUCTURA REAL');
+        console.log('   - ID de notificación:', results.insertId);
+
+        res.status(201).json({
+          message: 'Notificación de falla creada exitosamente',
+          id_notificacion: results.insertId,
+          estado: 'pendiente',
+          data: {
+            id_notificacion: results.insertId,
+            eco: nuevaNotificacion.eco,
+            placas: nuevaNotificacion.placas,
+            marca: nuevaNotificacion.marca,
+            anio: nuevaNotificacion.anio,
+            descripcion: nuevaNotificacion.descripcion,
+            estado: nuevaNotificacion.estado,
+            usuario_reporta: {
+              id: nuevaNotificacion.usuario_reporta_id,
+              nombre: nuevaNotificacion.nombre_usuario_reporta,
+              correo: nuevaNotificacion.correo_usuario_reporta
+            },
+            lugar_info: {
+              id_lugar: lugarEncontrado.id_lugar,
+              nombre: lugarEncontrado.nombre
+            },
+            fecha_creacion: new Date().toISOString()
+          }
+        });
       });
     });
   });
 });
 // Eliminar un registro en tb_fallas
-router.delete('/fallas/:id', (req, res) => {
+router.delete('/notificaciones/:id', (req, res) => {
   const id = req.params.id;
 
   // Verificar que el registro existe antes de eliminar
-  connection.query('SELECT * FROM tb_fallas WHERE id_falla = ?', [id], (err, results) => {
+  connection.query('SELECT * FROM tb_notificaciones WHERE id = ?', [id], (err, results) => {
     if (err) {
       console.error('Error al buscar el registro:', err);
       return res.status(500).json({ error: 'Error al buscar el registro' });
@@ -495,7 +492,7 @@ router.delete('/fallas/:id', (req, res) => {
       return res.status(404).json({ error: 'Registro no encontrado' });
     }
 
-    connection.query('DELETE FROM tb_fallas WHERE id_falla = ?', [id], (err, deleteResults) => {
+    connection.query('DELETE FROM tb_notificaciones WHERE id = ?', [id], (err, deleteResults) => {
       if (err) {
         console.error('Error al eliminar la falla:', err);
         return res.status(500).json({ error: 'Error al eliminar la falla' });
