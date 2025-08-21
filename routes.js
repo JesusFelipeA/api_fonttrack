@@ -1,11 +1,17 @@
 // routes.js
+// Importar Express y crear router
 const express = require('express');
 const router = express.Router();
+
+// Importar conexión a la base de datos
 const connection = require('./db');
-const bcrypt = require('bcryptjs'); // Asegúrate de tener esta línea arriba
+
+// Importar bcrypt para manejar contraseñas encriptadas
+const bcrypt = require('bcryptjs');
 
 //----------- USUARIOS -------------
-// Obtener todos los registros de tb_users
+
+// Obtener todos los usuarios
 router.get('/usuarios', (req, res) => {
   connection.query('SELECT * FROM tb_users', (err, results) => {
     if (err) {
@@ -17,7 +23,7 @@ router.get('/usuarios', (req, res) => {
   });
 });
 
-// Obtener un registro de tb_users por su ID
+// Obtener un usuario específico por ID
 router.get('/usuarios/:id', (req, res) => {
   const id = req.params.id;
   connection.query('SELECT * FROM tb_users WHERE id_usuario = ?', id, (err, results) => {
@@ -26,6 +32,7 @@ router.get('/usuarios/:id', (req, res) => {
       res.status(500).json({ error: 'Error al obtener el registro' });
       return;
     }
+    // Si no encuentra el usuario, devolver error 404
     if (results.length === 0) {
       res.status(404).json({ error: 'Registro no encontrado' });
       return;
@@ -34,7 +41,7 @@ router.get('/usuarios/:id', (req, res) => {
   });
 });
 
-// Crear un nuevo registro en tb_users
+// Crear un nuevo usuario
 router.post('/usuarios', (req, res) => {
   const nuevoRegistro = req.body;
   connection.query('INSERT INTO tb_users SET ?', nuevoRegistro, (err, results) => {
@@ -47,7 +54,7 @@ router.post('/usuarios', (req, res) => {
   });
 });
 
-// Actualizar un registro en tb_users
+// Actualizar un usuario existente
 router.put('/usuarios/:id', (req, res) => {
   const id = req.params.id;
   const datosActualizados = req.body;
@@ -61,7 +68,7 @@ router.put('/usuarios/:id', (req, res) => {
   });
 });
 
-// Eliminar un registro en tb_users
+// Eliminar un usuario
 router.delete('/usuarios/:id', (req, res) => {
   const id = req.params.id;
   connection.query('DELETE FROM tb_usuarios WHERE id_usuario = ?', id, (err, results) => {
@@ -75,7 +82,8 @@ router.delete('/usuarios/:id', (req, res) => {
 });
 
 //----------- MATERIALES -------------
-// Obtener todos los registros de tb_materiales
+
+// Obtener todos los materiales
 router.get('/materiales', (req, res) => {
   connection.query('SELECT * FROM tb_materiales', (err, results) => {
     if (err) {
@@ -87,7 +95,7 @@ router.get('/materiales', (req, res) => {
   });
 });
 
-// Obtener un registro de tb_materiales por su ID
+// Obtener un material específico por ID
 router.get('/materiales/:id', (req, res) => {
   const id = req.params.id;
   connection.query('SELECT * FROM tb_materiales WHERE id_material = ?', id, (err, results) => {
@@ -104,7 +112,7 @@ router.get('/materiales/:id', (req, res) => {
   });
 });
 
-// Crear un nuevo registro en tb_materiales
+// Crear un nuevo material
 router.post('/materiales', (req, res) => {
   const nuevoRegistro = req.body;
   connection.query('INSERT INTO tb_materiales SET ?', nuevoRegistro, (err, results) => {
@@ -117,7 +125,7 @@ router.post('/materiales', (req, res) => {
   });
 });
 
-// Actualizar un registro en tb_materiales
+// Actualizar un material existente
 router.put('/materiales/:id', (req, res) => {
   const id = req.params.id;
   const datosActualizados = req.body;
@@ -131,7 +139,7 @@ router.put('/materiales/:id', (req, res) => {
   });
 });
 
-// Eliminar un registro en tb_materiales
+// Eliminar un material
 router.delete('/materiales/:id', (req, res) => {
   const id = req.params.id;
   connection.query('DELETE FROM tb_materiales WHERE id_material = ?', id, (err, results) => {
@@ -145,7 +153,8 @@ router.delete('/materiales/:id', (req, res) => {
 });
 
 //----------- LUGARES -------------
-// Obtener todos los registros de tb_lugares
+
+// Obtener todos los lugares
 router.get('/lugares', (req, res) => {
   connection.query('SELECT * FROM tb_lugares', (err, results) => {
     if (err) {
@@ -157,7 +166,7 @@ router.get('/lugares', (req, res) => {
   });
 });
 
-// Obtener un registro de tb_lugares por su ID
+// Obtener un lugar específico por ID
 router.get('/lugares/:id', (req, res) => {
   const id = req.params.id;
   connection.query('SELECT * FROM tb_lugares WHERE id_lugar = ?', id, (err, results) => {
@@ -174,7 +183,7 @@ router.get('/lugares/:id', (req, res) => {
   });
 });
 
-// Crear un nuevo registro en tb_lugares
+// Crear un nuevo lugar
 router.post('/lugares', (req, res) => {
   const nuevoRegistro = req.body;
   connection.query('INSERT INTO tb_lugares SET ?', nuevoRegistro, (err, results) => {
@@ -187,7 +196,7 @@ router.post('/lugares', (req, res) => {
   });
 });
 
-// Actualizar un registro en tb_lugares
+// Actualizar un lugar existente
 router.put('/lugares/:id', (req, res) => {
   const id = req.params.id;
   const datosActualizados = req.body;
@@ -201,7 +210,7 @@ router.put('/lugares/:id', (req, res) => {
   });
 });
 
-// Eliminar un registro en tb_lugares
+// Eliminar un lugar
 router.delete('/lugares/:id', (req, res) => {
   const id = req.params.id;
   connection.query('DELETE FROM tb_lugares WHERE id_lugar = ?', id, (err, results) => {
@@ -215,35 +224,40 @@ router.delete('/lugares/:id', (req, res) => {
 });
 
 // ---------- LOGIN ----------
+
+// Autenticación de usuarios
 router.post('/login', (req, res) => {
   const { correo, password } = req.body;
 
-  // Buscar al usuario por correo
+  // Buscar usuario en la base de datos por correo
   connection.query('SELECT * FROM tb_users WHERE correo = ?', [correo], async (err, results) => {
     if (err) {
       console.error('Error al buscar el usuario:', err);
       return res.status(500).json({ error: 'Error del servidor' });
     }
 
+    // Si no existe el usuario
     if (results.length === 0) {
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
 
     const usuario = results[0];
 
-    // Comparar contraseña ingresada con la hash de la BD
+    // Verificar la contraseña usando bcrypt
     const passwordValida = await bcrypt.compare(password, usuario.password);
 
     if (!passwordValida) {
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
 
-    // Si todo está bien
+    // Login exitoso
     res.json({ mensaje: 'Login exitoso', usuario });
   });
 });
 
-// Obtener todos los registros de tb_fallas
+//----------- NOTIFICACIONES/FALLAS -------------
+
+// Obtener todas las notificaciones ordenadas por fecha
 router.get('/notificaciones', (req, res) => {
   connection.query('SELECT * FROM tb_fallas ORDER BY created_at DESC', (err, results) => {
     if (err) {
@@ -255,7 +269,7 @@ router.get('/notificaciones', (req, res) => {
   });
 });
 
-// Obtener un registro de tb_fallas por su ID
+// Obtener una falla específica por ID
 router.get('/fallas/:id', (req, res) => {
   const id = req.params.id;
   connection.query('SELECT * FROM tb_notificaciones WHERE id = ?', [id], (err, results) => {
@@ -272,30 +286,33 @@ router.get('/fallas/:id', (req, res) => {
   });
 });
 
-// Crear un nuevo registro en tb_fallas
+// Crear una nueva falla/notificación
 router.post('/fallas', (req, res) => {
   console.log('=== DATOS RECIBIDOS (PARA tb_notificaciones REAL) ===');
   console.log(req.body);
 
+  // Extraer datos del body de la petición
   const { 
     eco, placas, descripcion, observaciones, id_lugar, 
     material, marca, anio, km, fecha, nombre_conductor,
     reviso_por, autorizado_por, materials, cantidad,
   } = req.body;
 
+  // Función para validar strings de forma segura
   const safeString = (value) => {
     if (value === null || value === undefined) return null;
     if (typeof value === 'string') return value.trim();
     return String(value).trim();
   };
 
+  // Función para validar números de forma segura
   const safeNumber = (value) => {
     if (value === null || value === undefined || value === '') return null;
     const num = parseInt(value);
     return isNaN(num) ? null : num;
   };
 
-  // VALIDACIÓN DE CAMPOS REQUERIDOS
+  // Validar que los campos requeridos estén presentes
   if (!eco || !placas || !descripcion || !observaciones || !id_lugar) {
     console.log('❌ Validación fallida - campos faltantes');
     return res.status(400).json({
@@ -310,6 +327,7 @@ router.post('/fallas', (req, res) => {
     });
   }
 
+  // Validar que id_lugar sea un número válido
   const idLugarNum = safeNumber(id_lugar);
   if (!idLugarNum || idLugarNum <= 0) {
     console.log('❌ id_lugar inválido:', id_lugar);
@@ -318,7 +336,7 @@ router.post('/fallas', (req, res) => {
     });
   }
 
-  // BUSCAR UN USUARIO VÁLIDO PARA usuario_reporta_id
+  // Buscar un usuario válido para asociar la falla
   console.log('🔍 Buscando usuario para usuario_reporta_id...');
   
   connection.query('SELECT id_usuario, nombre, correo FROM tb_users LIMIT 1', (err, usuarios) => {
@@ -330,6 +348,7 @@ router.post('/fallas', (req, res) => {
       });
     }
 
+    // Verificar que exista al menos un usuario
     if (usuarios.length === 0) {
       console.log('❌ No hay usuarios en tb_users');
       return res.status(400).json({
@@ -341,7 +360,7 @@ router.post('/fallas', (req, res) => {
     const usuarioReporta = usuarios[0];
     console.log('✅ Usuario encontrado para reportar:', usuarioReporta);
 
-    // VERIFICAR QUE EL LUGAR EXISTE
+    // Verificar que el lugar existe en la base de datos
     console.log('🔍 Verificando que el lugar existe:', idLugarNum);
     
     connection.query('SELECT * FROM tb_lugares WHERE id_lugar = ?', [idLugarNum], (err, lugares) => {
@@ -353,6 +372,7 @@ router.post('/fallas', (req, res) => {
         });
       }
 
+      // Verificar que el lugar existe
       if (lugares.length === 0) {
         console.log('❌ Lugar no encontrado:', idLugarNum);
         return res.status(400).json({
@@ -363,43 +383,43 @@ router.post('/fallas', (req, res) => {
       const lugarEncontrado = lugares[0];
       console.log('✅ Lugar verificado:', lugarEncontrado);
 
-      // PREPARAR DATOS PARA INSERTAR EN tb_notificaciones (ESTRUCTURA REAL)
+      // Preparar objeto con todos los datos para insertar
       const nuevaNotificacion = {
-        // Campos básicos de la falla
+        // Información básica del vehículo
         id_lugar: idLugarNum,
         eco: safeString(eco),
         placas: safeString(placas) ? safeString(placas).toUpperCase() : null,
         marca: safeString(marca),
-        anio: safeString(anio), // En tu tabla es 'anio', no 'ano'
+        anio: safeString(anio),
         km: safeString(km),
-        fecha: safeString(fecha), // Formato DATE
+        fecha: safeString(fecha),
         nombre_conductor: safeString(nombre_conductor),
         descripcion: safeString(descripcion),
         observaciones: safeString(observaciones),
         
-        // Usuario que reporta (obligatorio por foreign key)
+        // Usuario que reporta la falla
         usuario_reporta_id: usuarioReporta.id_usuario,
         nombre_usuario_reporta: safeString(usuarioReporta.nombre),
         correo_usuario_reporta: safeString(usuarioReporta.correo),
         
-        // Material
+        // Información de materiales
         material: safeString(material),
         cantidad: safeNumber(cantidad) || 0,
         materials: materials && Array.isArray(materials) && materials.length > 0 
           ? JSON.stringify(materials) 
           : null,
         
-        // Correo destino (opcional)
-        correo_destino: safeString(usuarioReporta.correo), // Usar el mismo usuario por defecto
+        // Correo de destino
+        correo_destino: safeString(usuarioReporta.correo),
         
-        // Estado inicial
-        estado: 'pendiente', // ENUM: pendiente, aprobada, rechazada
+        // Estado inicial de la notificación
+        estado: 'pendiente',
         
-        // Campos de autorización (opcionales)
+        // Campos de autorización opcionales
         autorizado_por: safeString(autorizado_por),
         reviso_por: safeString(reviso_por),
         
-        // Campos de aprobación (null inicialmente)
+        // Campos de aprobación que se llenan después
         usuario_aprueba_id: null,
         nombre_usuario_aprueba: null,
         correo_usuario_aprueba: null,
@@ -410,13 +430,14 @@ router.post('/fallas', (req, res) => {
       console.log('=== DATOS PREPARADOS PARA tb_notificaciones (ESTRUCTURA REAL) ===');
       console.log(nuevaNotificacion);
 
-      // INSERTAR EN tb_notificaciones
+      // Insertar la nueva notificación en la base de datos
       connection.query('INSERT INTO tb_notificaciones SET ?', nuevaNotificacion, (err, results) => {
         if (err) {
           console.error('❌ ERROR SQL al insertar notificación:', err.code);
           console.error('❌ MENSAJE:', err.sqlMessage);
           console.error('❌ QUERY:', err.sql);
 
+          // Manejar diferentes tipos de errores SQL
           let errorMessage = 'Error al crear la notificación';
           let solucion = '';
           
@@ -449,6 +470,7 @@ router.post('/fallas', (req, res) => {
         console.log('✅ NOTIFICACIÓN CREADA EXITOSAMENTE EN ESTRUCTURA REAL');
         console.log('   - ID de notificación:', results.insertId);
 
+        // Respuesta exitosa
         res.status(201).json({
           message: 'Notificación de falla creada exitosamente',
           id_notificacion: results.insertId,
@@ -477,11 +499,12 @@ router.post('/fallas', (req, res) => {
     });
   });
 });
-// Eliminar un registro en tb_fallas
+
+// Eliminar una falla
 router.delete('/fallas/:id', (req, res) => {
   const id = req.params.id;
 
-  // Verificar que el registro existe antes de eliminar
+  // Verificar que la falla existe antes de eliminarla
   connection.query('SELECT * FROM tb_notificaciones WHERE id = ?', [id], (err, results) => {
     if (err) {
       console.error('Error al buscar el registro:', err);
@@ -492,6 +515,7 @@ router.delete('/fallas/:id', (req, res) => {
       return res.status(404).json({ error: 'Registro no encontrado' });
     }
 
+    // Eliminar la falla
     connection.query('DELETE FROM tb_notificaciones WHERE id = ?', [id], (err, deleteResults) => {
       if (err) {
         console.error('Error al eliminar la falla:', err);
@@ -506,13 +530,15 @@ router.delete('/fallas/:id', (req, res) => {
   });
 });
 
-// NUEVO: Buscar fallas con filtros
+// Buscar fallas con filtros específicos
 router.get('/fallas/buscar', (req, res) => {
   const { eco, placas, marca, conductor, fecha_desde, fecha_hasta } = req.query;
 
+  // Construir query dinámico basado en los filtros recibidos
   let query = 'SELECT * FROM tb_fallas WHERE 1=1';
   let params = [];
 
+  // Agregar filtros si están presentes
   if (eco) {
     query += ' AND eco LIKE ?';
     params.push(`%${eco}%`);
@@ -543,8 +569,10 @@ router.get('/fallas/buscar', (req, res) => {
     params.push(fecha_hasta);
   }
 
+  // Ordenar por fecha más reciente
   query += ' ORDER BY created_at DESC';
 
+  // Ejecutar la búsqueda
   connection.query(query, params, (err, results) => {
     if (err) {
       console.error('Error al buscar registros:', err);
@@ -555,6 +583,5 @@ router.get('/fallas/buscar', (req, res) => {
   });
 });
 
-
-
+// Exportar el router para uso en el archivo principal
 module.exports = router;
